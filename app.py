@@ -167,6 +167,134 @@ st.markdown("""
 
 # 헤더 영역
 st.title("📋 PlanPulse (플랜펄스) - 국책 사업계획서 자동생성 엔진")
+
+# -----------------------------------------------------------------------------
+# 신청 대상 선택 (모드 스위치)
+# -----------------------------------------------------------------------------
+MODE_MARKET = "🏛️ 전통시장 및 상점가 활성화 지원사업 (3개년 20억원 국책 공모)"
+MODE_PERSONAL = "🏪 개인 소상공인 정책자금 신청서 (운전/시설자금 5천만~1억원 간이계획서)"
+app_mode = st.radio("신청 대상 선택", [MODE_MARKET, MODE_PERSONAL], key="app_mode")
+
+if app_mode == MODE_PERSONAL:
+    import tempfile
+    from datetime import date
+    from core.personal_loan import (
+        calc_repayment_schedule, summarize_by_year, project_revenue, build_personal_loan_docx,
+    )
+
+    st.caption("소상공인시장진흥공단 / 신용보증재단 정책자금(5천만~1억원) 신청용 간이 사업계획서 (3~5P)")
+    st.info("ℹ️ 기관별 공식 제출 양식이 따로 있으면 그 양식을 우선하세요. 이 서식은 사업개요·자금소요·사업타당성·상환계획을 정리한 간이 계획서입니다.")
+
+    ptab1, ptab2, ptab3, ptab4, ptab5 = st.tabs([
+        "1단계: 사업체 프로필", "2단계: 자금 필요성 & 용도", "3단계: 사업 경쟁력",
+        "4단계: 매출 & 상환 계획", "5단계: 대표자 역량 & 가점",
+    ])
+
+    with ptab1:
+        st.subheader("1단계: 사업체 프로필")
+        c1, c2 = st.columns(2)
+        with c1:
+            pl_name = st.text_input("상호명", key="pl_name")
+            pl_bizno = st.text_input("사업자등록번호", placeholder="000-00-00000", key="pl_bizno")
+            pl_owner = st.text_input("대표자 성명", key="pl_owner")
+        with c2:
+            pl_industry = st.selectbox("업종", ["음식", "소매", "제조", "서비스"], key="pl_industry")
+            pl_start = st.number_input("창업연도", 1980, date.today().year, 2020, key="pl_start")
+            pl_revenue_man = st.number_input("연간 매출액 (만원)", 0, 10_000_000, 12000, step=100, key="pl_revenue")
+
+    with ptab2:
+        st.subheader("2단계: 자금 필요성 & 용도")
+        pl_amount_man = st.number_input("신청 금액 (만원)", 500, 10000, 5000, step=100, key="pl_amount",
+                                        help="소상공인 정책자금 일반 신청 범위: 5천만~1억원")
+        if pl_amount_man < 5000 or pl_amount_man > 10000:
+            st.warning("⚠️ 일반적인 신청 범위(5천만~1억원)를 벗어났습니다. 해당 기관 공고를 확인하세요.")
+        fac_pct = st.slider("시설자금 비중 (%)", 0, 100, 40, key="pl_fac_pct")
+        fac_man = round(pl_amount_man * fac_pct / 100)
+        work_man = pl_amount_man - fac_man
+        m1, m2 = st.columns(2)
+        m1.metric("시설자금", f"{fac_man:,} 만원")
+        m2.metric("운전자금", f"{work_man:,} 만원")
+        pl_fac_use = st.text_area("시설자금 세부 용도 (예: 주방설비 교체, 인테리어 개보수)", key="pl_fac_use", height=80)
+        pl_work_use = st.text_area("운전자금 세부 용도 (예: 원재료 구입, 임차료, 인건비)", key="pl_work_use", height=80)
+        pl_difficulty = st.text_area("당면 경영애로", key="pl_difficulty", height=120,
+                                     placeholder="예: 원재료비 상승과 고정비 부담으로 운영자금이 부족하고, 노후 설비로 생산성이 떨어짐")
+
+    with ptab3:
+        st.subheader("3단계: 사업 경쟁력")
+        pl_signature = st.text_area("대표 시그니처 상품/메뉴", key="pl_signature", height=90)
+        pl_target = st.text_area("주요 타깃 고객층", key="pl_target", height=90)
+        pl_marketing = st.text_area("온·오프라인 마케팅 방안", key="pl_marketing", height=120,
+                                    placeholder="예: 네이버 플레이스·인스타그램 운영, 배달앱 입점, 단골 쿠폰, 지역 행사 참여")
+
+    with ptab4:
+        st.subheader("4단계: 매출 & 상환 계획")
+        base_man = pl_revenue_man
+        g1, g2, g3 = st.columns(3)
+        gr = [g1.number_input("1차년도 성장률 (%)", -50.0, 200.0, 10.0, 1.0, key="pl_g1"),
+              g2.number_input("2차년도 성장률 (%)", -50.0, 200.0, 8.0, 1.0, key="pl_g2"),
+              g3.number_input("3차년도 성장률 (%)", -50.0, 200.0, 6.0, 1.0, key="pl_g3")]
+        revs = project_revenue(base_man * 10000, gr)
+        st.table([{"구분": f"{i+1}차년도", "추정 매출액": f"{v:,} 원"} for i, v in enumerate(revs)])
+
+        r1, r2, r3 = st.columns(3)
+        pl_rate = r1.number_input("대출 금리 (연 %)", 0.0, 20.0, 3.5, 0.1, key="pl_rate")
+        pl_term = r2.number_input("상환 기간 (개월)", 12, 120, 60, 6, key="pl_term")
+        pl_grace = r3.number_input("거치 기간 (개월)", 0, 36, 12, 6, key="pl_grace")
+        schedule = calc_repayment_schedule(pl_amount_man * 10000, pl_rate, int(pl_term), int(pl_grace))
+        st.markdown("##### 연도별 상환 요약")
+        st.table([{"구분": f"{y['year']}년차", "원금": f"{y['principal']:,}", "이자": f"{y['interest']:,}",
+                   "상환액 합계": f"{y['payment']:,}", "연말 잔액": f"{y['balance']:,}"}
+                  for y in summarize_by_year(schedule)])
+        with st.expander("월별 상환 로드맵 전체 보기"):
+            st.dataframe(pd.DataFrame(schedule).rename(columns={
+                "month": "회차", "principal": "원금", "interest": "이자", "payment": "납부액", "balance": "잔액"}),
+                use_container_width=True, hide_index=True)
+        peak = max(r["payment"] for r in schedule)
+        if revs and peak * 12 > revs[0] * 0.3:
+            st.warning("⚠️ 연간 상환액이 1차년도 추정 매출의 30%를 넘습니다. 상환 능력 설명을 보강하세요.")
+
+    with ptab5:
+        st.subheader("5단계: 대표자 역량 & 가점")
+        k1, k2 = st.columns(2)
+        pl_youth = k1.checkbox("청년 (만 39세 이하) 대표자", key="pl_youth")
+        pl_female = k2.checkbox("여성기업", key="pl_female")
+        pl_career = st.number_input("관련 업종 경력 (년)", 0, 60, 3, key="pl_career")
+        pl_career_text = st.text_area("경력·자격 상세 (선택)", key="pl_career_text", height=100)
+
+        st.markdown("---")
+        missing = [n for n, v in [("상호명", pl_name), ("대표자 성명", pl_owner), ("당면 경영애로", pl_difficulty)] if not v.strip()]
+        if missing:
+            st.info("DOCX 생성 전 입력 필요: " + ", ".join(missing))
+        if st.button("📄 정책자금 사업계획서 DOCX 생성", type="primary", use_container_width=True,
+                     key="pl_build", disabled=bool(missing)):
+            data = {
+                "business_name": pl_name, "biz_no": pl_bizno, "owner_name": pl_owner,
+                "industry": pl_industry, "start_year": int(pl_start),
+                "annual_revenue": base_man * 10000, "amount": pl_amount_man * 10000,
+                "facility_amount": fac_man * 10000, "working_amount": work_man * 10000,
+                "facility_use": pl_fac_use, "working_use": pl_work_use, "difficulty": pl_difficulty,
+                "signature": pl_signature, "target": pl_target, "marketing": pl_marketing,
+                "revenue_forecast": revs, "rate": pl_rate, "term_months": int(pl_term),
+                "grace_months": int(pl_grace), "schedule": schedule,
+                "is_youth": pl_youth, "is_female": pl_female, "career_years": int(pl_career),
+                "owner_career_text": pl_career_text,
+            }
+            try:
+                out = os.path.join(tempfile.mkdtemp(prefix="planpulse_pl_"), "policy_fund_plan.docx")
+                build_personal_loan_docx(data, out)
+                with open(out, "rb") as f:
+                    st.session_state.pl_docx = f.read()
+                st.session_state.pl_docx_name = f"{pl_name}_정책자금_사업계획서.docx"
+                st.toast("사업계획서 DOCX가 생성되었습니다!", icon="📄")
+            except Exception as e:
+                st.error(f"DOCX 생성 실패: {e}")
+        if st.session_state.get("pl_docx"):
+            st.download_button("💾 DOCX 다운로드", data=st.session_state.pl_docx,
+                               file_name=st.session_state.pl_docx_name,
+                               mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                               use_container_width=True, key="pl_download")
+    st.stop()
+
 st.caption("중소벤처기업부 / 소상공인시장진흥공단 2027년도 전통시장 및 상점가 활성화 지원사업 (문화관광형 3개년 20억원)")
 
 # 프리셋 데이터 정의
