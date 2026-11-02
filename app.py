@@ -162,6 +162,30 @@ st.markdown("""
         h1 { font-size: 1.5rem !important; }
         .block-container { padding: 1rem 0.8rem !important; }
     }
+    /* 기본 빨간 밑줄 및 하단 경계선 제거 */
+    div[data-baseweb="tab-highlight"], div[data-baseweb="tab-border"] {
+        display: none !important;
+    }
+    /* 탭 버튼 둥근 알약 스타일 */
+    div[data-baseweb="tab-list"] {
+        gap: 8px !important;
+    }
+    div[data-baseweb="tab-list"] button[data-baseweb="tab"] {
+        border-radius: 20px !important;
+        padding: 6px 16px !important;
+        border: 1px solid #E2E8F0 !important;
+        background-color: #FFFFFF !important;
+        color: #475569 !important;
+    }
+    /* 활성화된 탭 (딥네이비) */
+    div[data-baseweb="tab-list"] button[aria-selected="true"] {
+        background-color: #1B365D !important;
+        color: #FFFFFF !important;
+        border-color: #1B365D !important;
+    }
+    div[data-baseweb="tab-list"] button[aria-selected="true"] p {
+        color: #FFFFFF !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
