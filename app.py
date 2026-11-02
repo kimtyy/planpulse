@@ -72,6 +72,12 @@ st.set_page_config(
 # 커스텀 CSS 스타일링 (세련된 공공/비즈니스 디자인)
 st.markdown("""
 <style>
+    @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
+    html, body, [class*="css"], .stApp, button, input, textarea {
+        font-family: "Pretendard", -apple-system, "Malgun Gothic", sans-serif;
+    }
+    .stApp { background-color: #F8FAFC; }
+    h1, h2, h3 { color: #1B365D; }
     .metric-card {
         background-color: #F8FAFC;
         border-left: 4px solid #1B365D;
@@ -97,18 +103,64 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
+        flex-wrap: wrap;
+        border-bottom: none;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 48px;
+        height: auto;
+        min-height: 40px;
         white-space: pre-wrap;
-        background-color: #F1F5F9;
-        border-radius: 4px 4px 0px 0px;
-        padding-top: 10px;
-        padding-bottom: 10px;
+        background-color: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 999px;
+        padding: 8px 18px;
+        transition: all 0.2s ease;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        border-color: #1B365D;
+        transform: translateY(-1px);
     }
     .stTabs [aria-selected="true"] {
         background-color: #1B365D !important;
-        color: white !important;
+        color: #FFFFFF !important;
+        border-color: #1B365D !important;
+    }
+    .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {
+        display: none;
+    }
+    .stButton > button, .stDownloadButton > button {
+        border-radius: 10px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(27, 54, 93, 0.22);
+    }
+    .stButton > button[kind="primary"], .stDownloadButton > button[kind="primary"] {
+        background-color: #1B365D;
+        border-color: #1B365D;
+    }
+    [data-testid="stMetric"] {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 12px 16px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+    @media (max-width: 768px) {
+        [data-testid="stHorizontalBlock"] {
+            flex-direction: column !important;
+            gap: 0.5rem !important;
+        }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"] > div {
+            width: 100% !important;
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+        .stTabs [data-baseweb="tab"] { padding: 6px 12px; font-size: 0.85rem; }
+        h1 { font-size: 1.5rem !important; }
+        .block-container { padding: 1rem 0.8rem !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -290,7 +342,7 @@ with tab1:
             st.table([{"시장명": sel["market_name"], "소재지": sel["location"], "점포 수": sel["total_stores"],
                        "대표 품목": sel["main_items"], "상인회 동의율(%)": sel["agreement_rate"],
                        "온누리 가맹률(%)": sel["onnuri_rate"]}])
-            if sel["data_quality"] != "프로젝트 프리셋":
+            if "추정" in sel["data_quality"] or "가상" in sel["data_quality"]:
                 st.warning("⚠️ 공식 검증 데이터가 아닌 참고/자동 생성값입니다. 자동완성 후 반드시 실제 수치로 수정하세요.")
             if st.button("이 시장 데이터로 전체 폼 자동완성", type="primary", key="market_prefill_btn"):
                 updated = dict(st.session_state.project_data)

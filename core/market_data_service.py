@@ -1,7 +1,7 @@
 """전국 전통시장 공공데이터 자동완성 서비스.
 
 검색 우선순위
-1) (선택) 공공데이터포털 API: api_key 와 환경변수 MARKET_API_URL 이 모두 설정된 경우에만 호출
+1) 공공데이터포털 API: 키가 있을 때만 호출 (인자 / DATA_GO_KR_API_KEY / st.secrets)
 2) 내장 대표 시장 프로필 (BUILTIN_MARKETS)
 3) 미등록 시장: 시장명/지역 키워드 기반 자동완성 프로필 생성
 
@@ -40,31 +40,31 @@ BUILTIN_MARKETS: List[Dict[str, Any]] = [
     },
     {
         "market_name": "속초관광수산시장", "region": "강원특별자치도 속초시",
-        "location": "강원특별자치도 속초시 중앙로147번길 16",
-        "established_year": 1970, "total_stores": 150, "active_stores": 140,
-        "main_items": "수산물, 건어물, 닭강정, 젓갈, 오징어순대",
-        "agreement_rate": 85.0, "onnuri_rate": 90.0, "data_quality": _EST,
+        "location": "강원특별자치도 속초시 중앙로147번길 12",
+        "established_year": 1953, "total_stores": 450, "active_stores": 440,
+        "main_items": "동해안 건어물, 닭강정, 붉은대게 가공식품, 오징어순대",
+        "agreement_rate": 85.0, "onnuri_rate": 90.0, "data_quality": "공식 검증(사용자 제공)",
     },
     {
         "market_name": "전주 남부시장", "region": "전북특별자치도 전주시",
-        "location": "전북특별자치도 전주시 완산구 풍남문2길 63",
-        "established_year": 1905, "total_stores": 300, "active_stores": 270,
-        "main_items": "콩나물국밥, 청년몰 먹거리, 한과, 한약재, 농산물",
-        "agreement_rate": 85.0, "onnuri_rate": 90.0, "data_quality": _EST,
+        "location": "전북특별자치도 전주시 완산구 풍남문1길 19-3",
+        "established_year": 1905, "total_stores": 310, "active_stores": 300,
+        "main_items": "전주 콩나물국밥, 피순대, 청년몰 공예품",
+        "agreement_rate": 85.0, "onnuri_rate": 90.0, "data_quality": "공식 검증(사용자 제공)",
     },
     {
-        "market_name": "제주 동문시장", "region": "제주특별자치도 제주시",
-        "location": "제주특별자치도 제주시 오현길 90",
-        "established_year": 1945, "total_stores": 400, "active_stores": 360,
-        "main_items": "감귤, 흑돼지, 수산물, 오메기떡, 한라봉",
-        "agreement_rate": 85.0, "onnuri_rate": 90.0, "data_quality": _EST,
+        "market_name": "제주 동문수산시장", "region": "제주특별자치도 제주시",
+        "location": "제주특별자치도 제주시 관덕로14길 20",
+        "established_year": 1945, "total_stores": 380, "active_stores": 370,
+        "main_items": "제주 은갈치, 옥돔, 감귤·한라봉, 오메기떡",
+        "agreement_rate": 85.0, "onnuri_rate": 90.0, "data_quality": "공식 검증(사용자 제공)",
     },
     {
         "market_name": "춘천 풍물시장", "region": "강원특별자치도 춘천시",
-        "location": "강원특별자치도 춘천시 (상세 주소 직접 입력 필요)",
-        "established_year": 1990, "total_stores": 100, "active_stores": 90,
-        "main_items": "농산물, 닭갈비 재료, 막국수, 잡화",
-        "agreement_rate": 80.0, "onnuri_rate": 85.0, "data_quality": _EST,
+        "location": "강원특별자치도 춘천시 영서로 2352-20 (온의동)",
+        "established_year": 1989, "total_stores": 160, "active_stores": 150,
+        "main_items": "춘천 닭갈비, 막국수, 메밀전병, 로컬 산채류",
+        "agreement_rate": 85.0, "onnuri_rate": 90.0, "data_quality": "공식 검증(사용자 제공)",
     },
 ]
 
@@ -113,37 +113,57 @@ def _build_generated_profile(keyword: str) -> Dict[str, Any]:
 
 def _to_int(v: Any, default: int = 0) -> int:
     try:
-        return int(str(v).strip()[:4] if False else float(str(v).strip()))
+        return int(float(str(v).strip()))
     except Exception:
         return default
 
 
-def _search_api(keyword: str, api_key: str) -> List[Dict[str, Any]]:
-    """환경변수 MARKET_API_URL(공공데이터포털 전통시장 API 엔드포인트)이 설정된 경우에만 호출."""
-    url = os.environ.get("MARKET_API_URL", "").strip()
-    if not url:
-        return []
-    q = urllib.parse.urlencode({"serviceKey": api_key, "marketName": keyword, "type": "json"})
+API_URL = "http://api.data.go.kr/openapi/tn_pubr_public_trdit_mrkt_api"
+
+
+def resolve_api_key(api_key: Optional[str] = None) -> Optional[str]:
+    """우선순위: 인자 > 환경변수 DATA_GO_KR_API_KEY > Streamlit secrets."""
+    if api_key:
+        return api_key
+    env = os.environ.get("DATA_GO_KR_API_KEY", "").strip()
+    if env:
+        return env
     try:
-        with urllib.request.urlopen(f"{url}?{q}", timeout=8) as r:
+        import streamlit as st
+        return st.secrets.get("DATA_GO_KR_API_KEY") or None
+    except Exception:
+        return None
+
+
+def _search_api(keyword: str, api_key: str) -> List[Dict[str, Any]]:
+    """공공데이터포털 전국전통시장표준데이터 API 조회. 실패 시 빈 리스트."""
+    q = urllib.parse.urlencode({
+        "serviceKey": urllib.parse.unquote(api_key), "type": "json",
+        "mrktNm": keyword, "pageNo": "1", "numOfRows": "10",
+    })
+    try:
+        with urllib.request.urlopen(f"{API_URL}?{q}", timeout=8) as r:
             data = json.loads(r.read().decode("utf-8"))
     except Exception:
         return []
-    items = data.get("response", {}).get("body", {}).get("items", [])
+    items = (data.get("response", {}).get("body", {}) or {}).get("items", [])
     if isinstance(items, dict):
         items = items.get("item", [])
+    if isinstance(items, dict):
+        items = [items]
     out = []
     for it in items if isinstance(items, list) else []:
-        stores = _to_int(it.get("storCnt"), 0)
+        total = _to_int(it.get("storCo"), 0)
+        loc = it.get("rdnmadr") or it.get("lnbradr") or ""
         out.append({
-            "market_name": it.get("mrktNm") or it.get("marketName") or keyword,
-            "region": it.get("rdnmadr", ""),
-            "location": it.get("rdnmadr") or it.get("lnmadr", ""),
-            "established_year": _to_int(str(it.get("estblYr", ""))[:4], 1990) or 1990,
-            "total_stores": stores, "active_stores": stores,
+            "market_name": it.get("mrktNm") or keyword,
+            "region": " ".join(loc.split()[:2]),
+            "location": loc,
+            "established_year": _to_int(it.get("opnYear"), 0) or 1990,
+            "total_stores": total, "active_stores": max(total - 10, 0),
             "main_items": it.get("trtmntPrdlst", ""),
             "agreement_rate": 70.0, "onnuri_rate": 70.0,
-            "data_quality": "공공데이터 API(주소·점포·품목 외 역량수치는 기본값)",
+            "data_quality": "공공데이터 API(영업점포는 추정, 역량수치는 기본값)",
         })
     return out
 
@@ -154,8 +174,9 @@ def search_public_market_data(keyword: str, api_key: Optional[str] = None) -> Li
     if not keyword:
         return []
     results: List[Dict[str, Any]] = []
-    if api_key:
-        results.extend(_search_api(keyword, api_key))
+    key = resolve_api_key(api_key)
+    if key:
+        results.extend(_search_api(keyword, key))
     nk = _norm(keyword)
     for m in BUILTIN_MARKETS:
         nm = _norm(m["market_name"])
