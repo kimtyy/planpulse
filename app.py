@@ -207,7 +207,39 @@ if app_mode == MODE_PERSONAL:
     )
 
     st.caption("소상공인시장진흥공단 / 신용보증재단 정책자금(5천만\\~1억원) 신청용 간이 사업계획서 (3\\~5P)")
-    st.info("ℹ️ 기관별 공식 제출 양식이 따로 있으면 그 양식을 우선하세요. 이 서식은 사업개요·자금소요·사업타당성·상환계획을 정리한 간이 계획서입니다.")
+    FORM_STD = "PlanPulse 표준 간이서식 사용 (서식이 없을 때 5개 표 자동생성)"
+    FORM_UP = "📄 기관 공식 서식(DOCX) 직접 업로드하여 1:1 자동 완성"
+    pl_form_mode = st.radio("서식 선택", [FORM_STD, FORM_UP], key="pl_form_mode")
+    if pl_form_mode == FORM_STD:
+        st.info("ℹ️ 기관별 공식 제출 양식이 따로 있으면 그 양식을 우선하세요. 이 서식은 사업개요·자금소요·사업타당성·상환계획을 정리한 간이 계획서입니다.")
+    else:
+        from core.template_parser import parse_docx_template
+        from core.slot_filler import fill_template_slots
+        from core.personal_mapper import build_value_pool, map_slots
+        pl_up = st.file_uploader("기관 공식 서식(신청서/사업계획서 DOCX) 업로드", type=["docx"], key="pl_up_docx")
+        if pl_up is not None:
+            pl_fid = f"{pl_up.name}_{pl_up.size}"
+            if st.session_state.get("pl_up_id") != pl_fid:
+                up_dir = tempfile.mkdtemp(prefix="planpulse_plup_")
+                tpl_path = os.path.join(up_dir, "template.docx")
+                with open(tpl_path, "wb") as f:
+                    f.write(pl_up.getvalue())
+                try:
+                    st.session_state.pl_up_schema = parse_docx_template(tpl_path)
+                    st.session_state.pl_up_id = pl_fid
+                    st.session_state.pl_up_path = tpl_path
+                    st.session_state.pl_up_name = os.path.splitext(pl_up.name)[0]
+                    st.session_state.pop("pl_docx", None)
+                except Exception as e:
+                    st.session_state.pl_up_schema = None
+                    st.session_state.pl_up_id = None
+                    st.error(f"서식 분석 실패: {e}")
+            if st.session_state.get("pl_up_schema") is not None:
+                st.success(f"업로드한 서식에서 입력 슬롯 {len(st.session_state.pl_up_schema.slots)}개를 탐지했습니다. 아래 1~5단계를 작성한 뒤 5단계에서 생성하세요.")
+        else:
+            st.session_state.pl_up_schema = None
+            st.session_state.pl_up_id = None
+            st.info("DOCX 서식을 업로드하면 입력하신 1~5단계 내용이 서식의 해당 칸에 자동으로 들어갑니다.")
 
     ptab1, ptab2, ptab3, ptab4, ptab5 = st.tabs([
         "1단계: 사업체 프로필", "2단계: 자금 필요성 & 용도", "3단계: 사업 경쟁력",
@@ -287,8 +319,32 @@ if app_mode == MODE_PERSONAL:
 
         st.markdown("---")
         missing = [n for n, v in [("상호명", pl_name), ("대표자 성명", pl_owner), ("당면 경영애로", pl_difficulty)] if not v.strip()]
+        if pl_form_mode == FORM_UP and st.session_state.get("pl_up_schema") is None:
+            missing = missing + ["기관 공식 서식 DOCX 업로드"]
         if missing:
             st.info("DOCX 생성 전 입력 필요: " + ", ".join(missing))
+        if pl_form_mode == FORM_UP and st.session_state.get("pl_up_schema") is not None:
+            _pool = build_value_pool({
+                "business_name": pl_name, "biz_no": pl_bizno, "owner_name": pl_owner,
+                "industry": pl_industry, "start_year": int(pl_start),
+                "annual_revenue": base_man * 10000, "amount": pl_amount_man * 10000,
+                "facility_amount": fac_man * 10000, "working_amount": work_man * 10000,
+                "facility_use": pl_fac_use, "working_use": pl_work_use, "difficulty": pl_difficulty,
+                "signature": pl_signature, "target": pl_target, "marketing": pl_marketing,
+                "revenue_forecast": revs, "rate": pl_rate, "term_months": int(pl_term),
+                "grace_months": int(pl_grace), "schedule": schedule,
+                "is_youth": pl_youth, "is_female": pl_female, "career_years": int(pl_career),
+                "owner_career_text": pl_career_text,
+            })
+            _auto, _unm = map_slots(st.session_state.pl_up_schema, _pool)
+            with st.expander(f"🔗 서식 자동 매핑 결과 (자동 {len(_auto)}개 / 미매핑 {len(_unm)}개)"):
+                _lab = {sl.slot_id: sl.label for sl in st.session_state.pl_up_schema.slots}
+                st.table([{"서식 항목": _lab[k], "입력될 내용": (v[:60] + "…") if len(v) > 60 else v}
+                          for k, v in _auto.items()])
+            if _unm:
+                with st.expander(f"✍️ 미매핑 항목 직접 입력 ({len(_unm)}개, 비워두면 원본 유지)"):
+                    for sl in _unm:
+                        st.text_input(f"{sl.label}", key=f"pl_manual_{sl.slot_id}", placeholder=sl.hint[:60])
         if st.button("📄 정책자금 사업계획서 DOCX 생성", type="primary", use_container_width=True,
                      key="pl_build", disabled=bool(missing)):
             data = {
@@ -305,10 +361,20 @@ if app_mode == MODE_PERSONAL:
             }
             try:
                 out = os.path.join(tempfile.mkdtemp(prefix="planpulse_pl_"), "policy_fund_plan.docx")
-                build_personal_loan_docx(data, out)
+                if pl_form_mode == FORM_UP:
+                    up_schema = st.session_state.get("pl_up_schema")
+                    pool = build_value_pool(data)
+                    auto_vals, unmapped = map_slots(up_schema, pool)
+                    manual = {sl.slot_id: st.session_state.get(f"pl_manual_{sl.slot_id}", "")
+                              for sl in unmapped}
+                    vals = {**auto_vals, **{k: v for k, v in manual.items() if v}}
+                    fill_template_slots(st.session_state.pl_up_path, up_schema, vals, out)
+                else:
+                    build_personal_loan_docx(data, out)
                 with open(out, "rb") as f:
                     st.session_state.pl_docx = f.read()
-                st.session_state.pl_docx_name = f"{pl_name}_정책자금_사업계획서.docx"
+                st.session_state.pl_docx_name = (f"{pl_name}_{st.session_state.get('pl_up_name', '기관서식')}_작성완료.docx"
+                                                 if pl_form_mode == FORM_UP else f"{pl_name}_정책자금_사업계획서.docx")
                 st.toast("사업계획서 DOCX가 생성되었습니다!", icon="📄")
             except Exception as e:
                 st.error(f"DOCX 생성 실패: {e}")
