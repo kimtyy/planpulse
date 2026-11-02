@@ -72,12 +72,6 @@ st.set_page_config(
 # 커스텀 CSS 스타일링 (세련된 공공/비즈니스 디자인)
 st.markdown("""
 <style>
-    @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
-    html, body, [class*="css"], .stApp, button, input, textarea {
-        font-family: "Pretendard", -apple-system, "Malgun Gothic", sans-serif;
-    }
-    .stApp { background-color: #F8FAFC; }
-    h1, h2, h3 { color: #1B365D; }
     .metric-card {
         background-color: #F8FAFC;
         border-left: 4px solid #1B365D;
@@ -103,288 +97,24 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
-        flex-wrap: wrap;
-        border-bottom: none;
     }
     .stTabs [data-baseweb="tab"] {
-        height: auto;
-        min-height: 40px;
+        height: 48px;
         white-space: pre-wrap;
-        background-color: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 999px;
-        padding: 8px 18px;
-        transition: all 0.2s ease;
-    }
-    .stTabs [data-baseweb="tab"]:hover {
-        border-color: #1B365D;
-        transform: translateY(-1px);
+        background-color: #F1F5F9;
+        border-radius: 4px 4px 0px 0px;
+        padding-top: 10px;
+        padding-bottom: 10px;
     }
     .stTabs [aria-selected="true"] {
         background-color: #1B365D !important;
-        color: #FFFFFF !important;
-        border-color: #1B365D !important;
-    }
-    .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {
-        display: none;
-    }
-    .stButton > button, .stDownloadButton > button {
-        border-radius: 10px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .stButton > button:hover, .stDownloadButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(27, 54, 93, 0.22);
-    }
-    .stButton > button[kind="primary"], .stDownloadButton > button[kind="primary"] {
-        background-color: #1B365D;
-        border-color: #1B365D;
-    }
-    [data-testid="stMetric"] {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 12px;
-        padding: 12px 16px;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-    }
-    @media (max-width: 768px) {
-        [data-testid="stHorizontalBlock"] {
-            flex-direction: column !important;
-            gap: 0.5rem !important;
-        }
-        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
-        [data-testid="stHorizontalBlock"] > div {
-            width: 100% !important;
-            min-width: 100% !important;
-            flex: 1 1 100% !important;
-        }
-        .stTabs [data-baseweb="tab"] { padding: 6px 12px; font-size: 0.85rem; }
-        h1 { font-size: 1.5rem !important; }
-        .block-container { padding: 1rem 0.8rem !important; }
-    }
-    /* 기본 빨간 밑줄 및 하단 경계선 제거 */
-    div[data-baseweb="tab-highlight"], div[data-baseweb="tab-border"] {
-        display: none !important;
-    }
-    /* 탭 버튼 둥근 알약 스타일 */
-    div[data-baseweb="tab-list"] {
-        gap: 8px !important;
-    }
-    div[data-baseweb="tab-list"] button[data-baseweb="tab"] {
-        border-radius: 20px !important;
-        padding: 6px 16px !important;
-        border: 1px solid #E2E8F0 !important;
-        background-color: #FFFFFF !important;
-        color: #475569 !important;
-    }
-    /* 활성화된 탭 (딥네이비) */
-    div[data-baseweb="tab-list"] button[aria-selected="true"] {
-        background-color: #1B365D !important;
-        color: #FFFFFF !important;
-        border-color: #1B365D !important;
-    }
-    div[data-baseweb="tab-list"] button[aria-selected="true"] p {
-        color: #FFFFFF !important;
+        color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # 헤더 영역
-st.title("📋 PlanPulse (플랜펄스) - 정부지원 사업계획서 자동생성 엔진")
-
-# -----------------------------------------------------------------------------
-# 신청 대상 선택 (모드 스위치)
-# -----------------------------------------------------------------------------
-MODE_MARKET = "🏛️ 전통시장 및 상점가 활성화 지원사업 (3개년 20억원 국책 공모)"
-MODE_PERSONAL = "🏪 개인 소상공인 정책자금 신청서 (운전/시설자금 5천만~1억원 간이계획서)"
-app_mode = st.radio("신청 대상 선택", [MODE_MARKET, MODE_PERSONAL], key="app_mode")
-
-if app_mode == MODE_PERSONAL:
-    import tempfile
-    from datetime import date
-    from core.personal_loan import (
-        calc_repayment_schedule, summarize_by_year, project_revenue, build_personal_loan_docx,
-    )
-
-    st.caption("소상공인시장진흥공단 / 신용보증재단 정책자금(5천만\\~1억원) 신청용 간이 사업계획서 (3\\~5P)")
-    FORM_STD = "PlanPulse 표준 간이서식 사용 (서식이 없을 때 5개 표 자동생성)"
-    FORM_UP = "📄 기관 공식 서식(DOCX) 직접 업로드하여 1:1 자동 완성"
-    pl_form_mode = st.radio("서식 선택", [FORM_STD, FORM_UP], key="pl_form_mode")
-    if pl_form_mode == FORM_STD:
-        st.info("ℹ️ 기관별 공식 제출 양식이 따로 있으면 그 양식을 우선하세요. 이 서식은 사업개요·자금소요·사업타당성·상환계획을 정리한 간이 계획서입니다.")
-    else:
-        from core.template_parser import parse_docx_template
-        from core.slot_filler import fill_template_slots
-        from core.personal_mapper import build_value_pool, map_slots
-        pl_up = st.file_uploader("기관 공식 서식(신청서/사업계획서 DOCX) 업로드", type=["docx"], key="pl_up_docx")
-        if pl_up is not None:
-            pl_fid = f"{pl_up.name}_{pl_up.size}"
-            if st.session_state.get("pl_up_id") != pl_fid:
-                up_dir = tempfile.mkdtemp(prefix="planpulse_plup_")
-                tpl_path = os.path.join(up_dir, "template.docx")
-                with open(tpl_path, "wb") as f:
-                    f.write(pl_up.getvalue())
-                try:
-                    st.session_state.pl_up_schema = parse_docx_template(tpl_path)
-                    st.session_state.pl_up_id = pl_fid
-                    st.session_state.pl_up_path = tpl_path
-                    st.session_state.pl_up_name = os.path.splitext(pl_up.name)[0]
-                    st.session_state.pop("pl_docx", None)
-                except Exception as e:
-                    st.session_state.pl_up_schema = None
-                    st.session_state.pl_up_id = None
-                    st.error(f"서식 분석 실패: {e}")
-            if st.session_state.get("pl_up_schema") is not None:
-                st.success(f"업로드한 서식에서 입력 슬롯 {len(st.session_state.pl_up_schema.slots)}개를 탐지했습니다. 아래 1~5단계를 작성한 뒤 5단계에서 생성하세요.")
-        else:
-            st.session_state.pl_up_schema = None
-            st.session_state.pl_up_id = None
-            st.info("DOCX 서식을 업로드하면 입력하신 1~5단계 내용이 서식의 해당 칸에 자동으로 들어갑니다.")
-
-    ptab1, ptab2, ptab3, ptab4, ptab5 = st.tabs([
-        "1단계: 사업체 프로필", "2단계: 자금 필요성 & 용도", "3단계: 사업 경쟁력",
-        "4단계: 매출 & 상환 계획", "5단계: 대표자 역량 & 가점",
-    ])
-
-    with ptab1:
-        st.subheader("1단계: 사업체 프로필")
-        c1, c2 = st.columns(2)
-        with c1:
-            pl_name = st.text_input("상호명", key="pl_name")
-            pl_bizno = st.text_input("사업자등록번호", placeholder="000-00-00000", key="pl_bizno")
-            pl_owner = st.text_input("대표자 성명", key="pl_owner")
-        with c2:
-            pl_industry = st.selectbox("업종", ["음식", "소매", "제조", "서비스"], key="pl_industry")
-            pl_start = st.number_input("창업연도", 1980, date.today().year, 2020, key="pl_start")
-            pl_revenue_man = st.number_input("연간 매출액 (만원)", 0, 10_000_000, 12000, step=100, key="pl_revenue")
-
-    with ptab2:
-        st.subheader("2단계: 자금 필요성 & 용도")
-        pl_amount_man = st.number_input("신청 금액 (만원)", 500, 10000, 5000, step=100, key="pl_amount",
-                                        help="소상공인 정책자금 일반 신청 범위: 5천만~1억원")
-        if pl_amount_man < 5000 or pl_amount_man > 10000:
-            st.warning("⚠️ 일반적인 신청 범위(5천만\\~1억원)를 벗어났습니다. 해당 기관 공고를 확인하세요.")
-        fac_pct = st.slider("시설자금 비중 (%)", 0, 100, 40, key="pl_fac_pct")
-        fac_man = round(pl_amount_man * fac_pct / 100)
-        work_man = pl_amount_man - fac_man
-        m1, m2 = st.columns(2)
-        m1.metric("시설자금", f"{fac_man:,} 만원")
-        m2.metric("운전자금", f"{work_man:,} 만원")
-        pl_fac_use = st.text_area("시설자금 세부 용도 (예: 주방설비 교체, 인테리어 개보수)", key="pl_fac_use", height=80)
-        pl_work_use = st.text_area("운전자금 세부 용도 (예: 원재료 구입, 임차료, 인건비)", key="pl_work_use", height=80)
-        pl_difficulty = st.text_area("당면 경영애로", key="pl_difficulty", height=120,
-                                     placeholder="예: 원재료비 상승과 고정비 부담으로 운영자금이 부족하고, 노후 설비로 생산성이 떨어짐")
-
-    with ptab3:
-        st.subheader("3단계: 사업 경쟁력")
-        pl_signature = st.text_area("대표 시그니처 상품/메뉴", key="pl_signature", height=90)
-        pl_target = st.text_area("주요 타깃 고객층", key="pl_target", height=90)
-        pl_marketing = st.text_area("온·오프라인 마케팅 방안", key="pl_marketing", height=120,
-                                    placeholder="예: 네이버 플레이스·인스타그램 운영, 배달앱 입점, 단골 쿠폰, 지역 행사 참여")
-
-    with ptab4:
-        st.subheader("4단계: 매출 & 상환 계획")
-        base_man = pl_revenue_man
-        g1, g2, g3 = st.columns(3)
-        gr = [g1.number_input("1차년도 성장률 (%)", -50.0, 200.0, 10.0, 1.0, key="pl_g1"),
-              g2.number_input("2차년도 성장률 (%)", -50.0, 200.0, 8.0, 1.0, key="pl_g2"),
-              g3.number_input("3차년도 성장률 (%)", -50.0, 200.0, 6.0, 1.0, key="pl_g3")]
-        revs = project_revenue(base_man * 10000, gr)
-        st.table([{"구분": f"{i+1}차년도", "추정 매출액": f"{v:,} 원"} for i, v in enumerate(revs)])
-
-        r1, r2, r3 = st.columns(3)
-        pl_rate = r1.number_input("대출 금리 (연 %)", 0.0, 20.0, 3.5, 0.1, key="pl_rate")
-        pl_term = r2.number_input("상환 기간 (개월)", 12, 120, 60, 6, key="pl_term")
-        pl_grace = r3.number_input("거치 기간 (개월)", 0, 36, 12, 6, key="pl_grace")
-        schedule = calc_repayment_schedule(pl_amount_man * 10000, pl_rate, int(pl_term), int(pl_grace))
-        st.markdown("##### 연도별 상환 요약")
-        st.table([{"구분": f"{y['year']}년차", "원금": f"{y['principal']:,}", "이자": f"{y['interest']:,}",
-                   "상환액 합계": f"{y['payment']:,}", "연말 잔액": f"{y['balance']:,}"}
-                  for y in summarize_by_year(schedule)])
-        with st.expander("월별 상환 로드맵 전체 보기"):
-            st.dataframe(pd.DataFrame(schedule).rename(columns={
-                "month": "회차", "principal": "원금", "interest": "이자", "payment": "납부액", "balance": "잔액"}),
-                use_container_width=True, hide_index=True)
-        peak = max(r["payment"] for r in schedule)
-        if revs and peak * 12 > revs[0] * 0.3:
-            st.warning("⚠️ 연간 상환액이 1차년도 추정 매출의 30%를 넘습니다. 상환 능력 설명을 보강하세요.")
-
-    with ptab5:
-        st.subheader("5단계: 대표자 역량 & 가점")
-        k1, k2 = st.columns(2)
-        pl_youth = k1.checkbox("청년 (만 39세 이하) 대표자", key="pl_youth")
-        pl_female = k2.checkbox("여성기업", key="pl_female")
-        pl_career = st.number_input("관련 업종 경력 (년)", 0, 60, 3, key="pl_career")
-        pl_career_text = st.text_area("경력·자격 상세 (선택)", key="pl_career_text", height=100)
-
-        st.markdown("---")
-        missing = [n for n, v in [("상호명", pl_name), ("대표자 성명", pl_owner), ("당면 경영애로", pl_difficulty)] if not v.strip()]
-        if pl_form_mode == FORM_UP and st.session_state.get("pl_up_schema") is None:
-            missing = missing + ["기관 공식 서식 DOCX 업로드"]
-        if missing:
-            st.info("DOCX 생성 전 입력 필요: " + ", ".join(missing))
-        if pl_form_mode == FORM_UP and st.session_state.get("pl_up_schema") is not None:
-            _pool = build_value_pool({
-                "business_name": pl_name, "biz_no": pl_bizno, "owner_name": pl_owner,
-                "industry": pl_industry, "start_year": int(pl_start),
-                "annual_revenue": base_man * 10000, "amount": pl_amount_man * 10000,
-                "facility_amount": fac_man * 10000, "working_amount": work_man * 10000,
-                "facility_use": pl_fac_use, "working_use": pl_work_use, "difficulty": pl_difficulty,
-                "signature": pl_signature, "target": pl_target, "marketing": pl_marketing,
-                "revenue_forecast": revs, "rate": pl_rate, "term_months": int(pl_term),
-                "grace_months": int(pl_grace), "schedule": schedule,
-                "is_youth": pl_youth, "is_female": pl_female, "career_years": int(pl_career),
-                "owner_career_text": pl_career_text,
-            })
-            _auto, _unm = map_slots(st.session_state.pl_up_schema, _pool)
-            with st.expander(f"🔗 서식 자동 매핑 결과 (자동 {len(_auto)}개 / 미매핑 {len(_unm)}개)"):
-                _lab = {sl.slot_id: sl.label for sl in st.session_state.pl_up_schema.slots}
-                st.table([{"서식 항목": _lab[k], "입력될 내용": (v[:60] + "…") if len(v) > 60 else v}
-                          for k, v in _auto.items()])
-            if _unm:
-                with st.expander(f"✍️ 미매핑 항목 직접 입력 ({len(_unm)}개, 비워두면 원본 유지)"):
-                    for sl in _unm:
-                        st.text_input(f"{sl.label}", key=f"pl_manual_{sl.slot_id}", placeholder=sl.hint[:60])
-        if st.button("📄 정책자금 사업계획서 DOCX 생성", type="primary", use_container_width=True,
-                     key="pl_build", disabled=bool(missing)):
-            data = {
-                "business_name": pl_name, "biz_no": pl_bizno, "owner_name": pl_owner,
-                "industry": pl_industry, "start_year": int(pl_start),
-                "annual_revenue": base_man * 10000, "amount": pl_amount_man * 10000,
-                "facility_amount": fac_man * 10000, "working_amount": work_man * 10000,
-                "facility_use": pl_fac_use, "working_use": pl_work_use, "difficulty": pl_difficulty,
-                "signature": pl_signature, "target": pl_target, "marketing": pl_marketing,
-                "revenue_forecast": revs, "rate": pl_rate, "term_months": int(pl_term),
-                "grace_months": int(pl_grace), "schedule": schedule,
-                "is_youth": pl_youth, "is_female": pl_female, "career_years": int(pl_career),
-                "owner_career_text": pl_career_text,
-            }
-            try:
-                out = os.path.join(tempfile.mkdtemp(prefix="planpulse_pl_"), "policy_fund_plan.docx")
-                if pl_form_mode == FORM_UP:
-                    up_schema = st.session_state.get("pl_up_schema")
-                    pool = build_value_pool(data)
-                    auto_vals, unmapped = map_slots(up_schema, pool)
-                    manual = {sl.slot_id: st.session_state.get(f"pl_manual_{sl.slot_id}", "")
-                              for sl in unmapped}
-                    vals = {**auto_vals, **{k: v for k, v in manual.items() if v}}
-                    fill_template_slots(st.session_state.pl_up_path, up_schema, vals, out)
-                else:
-                    build_personal_loan_docx(data, out)
-                with open(out, "rb") as f:
-                    st.session_state.pl_docx = f.read()
-                st.session_state.pl_docx_name = (f"{pl_name}_{st.session_state.get('pl_up_name', '기관서식')}_작성완료.docx"
-                                                 if pl_form_mode == FORM_UP else f"{pl_name}_정책자금_사업계획서.docx")
-                st.toast("사업계획서 DOCX가 생성되었습니다!", icon="📄")
-            except Exception as e:
-                st.error(f"DOCX 생성 실패: {e}")
-        if st.session_state.get("pl_docx"):
-            st.download_button("💾 DOCX 다운로드", data=st.session_state.pl_docx,
-                               file_name=st.session_state.pl_docx_name,
-                               mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                               use_container_width=True, key="pl_download")
-    st.stop()
-
+st.title("📋 PlanPulse (플랜펄스) - 국책 사업계획서 자동생성 엔진")
 st.caption("중소벤처기업부 / 소상공인시장진흥공단 2027년도 전통시장 및 상점가 활성화 지원사업 (문화관광형 3개년 20억원)")
 
 # 프리셋 데이터 정의
@@ -528,7 +258,7 @@ if load_jatgoeul:
 p_data = st.session_state.project_data
 
 # 7개 탭 인터페이스 구성
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "1단계: 시장정보 & 4대역량",
     "2단계: 문제인식 (Problem)",
     "3단계: 특성화 솔루션 (Solution)",
@@ -536,7 +266,6 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "5단계: 20억 예산 & 46개 회계세목 (Scale-up) ✨",
     "6단계: 추진체계 (Team)",
     "🚀 AI 생성 & 심사 리포트 및 DOCX 다운로드",
-    "📄 내 공고문 직접 업로드 작성",
 ])
 
 # -----------------------------------------------------------------------------
@@ -544,30 +273,6 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
 # -----------------------------------------------------------------------------
 with tab1:
     st.subheader("1단계: 시장 기본정보 및 법정 4대 기초역량 검증")
-
-    with st.expander("🔍 전국 전통시장 실시간 공공데이터 자동완성", expanded=True):
-        from core.market_data_service import search_public_market_data, to_prefill
-        sq_col, key_col = st.columns([3, 2])
-        with sq_col:
-            market_query = st.text_input("시장 이름 검색", placeholder="예: 속초관광수산시장, 전주 남부시장, 제주 동문시장", key="market_search_q")
-        with key_col:
-            api_key_in = st.text_input("공공데이터포털 API 키 (선택)", type="password", key="market_api_key")
-        if market_query.strip():
-            found = search_public_market_data(market_query, api_key_in or None)
-            labels = [f"{m['market_name']} · {m['region']} [{m['data_quality']}]" for m in found]
-            pick = st.selectbox("검색 결과", range(len(found)), format_func=lambda i: labels[i], key="market_pick")
-            sel = found[min(pick, len(found) - 1)]
-            st.table([{"시장명": sel["market_name"], "소재지": sel["location"], "점포 수": sel["total_stores"],
-                       "대표 품목": sel["main_items"], "상인회 동의율(%)": sel["agreement_rate"],
-                       "온누리 가맹률(%)": sel["onnuri_rate"]}])
-            if "추정" in sel["data_quality"] or "가상" in sel["data_quality"]:
-                st.warning("⚠️ 공식 검증 데이터가 아닌 참고/자동 생성값입니다. 자동완성 후 반드시 실제 수치로 수정하세요.")
-            if st.button("이 시장 데이터로 전체 폼 자동완성", type="primary", key="market_prefill_btn"):
-                updated = dict(st.session_state.project_data)
-                updated.update(to_prefill(sel))
-                st.session_state.project_data = updated
-                st.toast(f"{sel['market_name']} 데이터로 폼이 자동완성되었습니다!", icon="✅")
-                st.rerun()
     col1, col2 = st.columns(2)
     with col1:
         market_name = st.text_input("시장/상점가 명칭", p_data["market_name"])
@@ -924,7 +629,7 @@ with tab7:
     mode_param = "full" if is_full_mode else "summary"
     
     if is_full_mode:
-        st.info("💡 **선택된 규격**: 10대 Work Packages(각 1.5\\~2P) + 46개 회계 세목(5P) + SWOT/거버넌스/평가표 수록 (약 32\\~77페이지 공문서)")
+        st.info("💡 **선택된 규격**: 10대 Work Packages(각 1.5~2P) + 46개 회계 세목(5P) + SWOT/거버넌스/평가표 수록 (약 32~77페이지 공문서)")
     else:
         st.info("💡 **선택된 규격**: 신청 요약표 및 비목 집계표 중심 1차 접수용 약 7페이지 요약서")
 
@@ -978,82 +683,3 @@ with tab7:
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True,
         )
-
-
-# -----------------------------------------------------------------------------
-# Tab 8: 내 공고문 직접 업로드 작성 (범용 서식 역공학 + 추천 답변 + 서식 보존 주입)
-# -----------------------------------------------------------------------------
-with tab8:
-    import tempfile
-    from core.template_parser import parse_docx_template
-    from core.smart_recommender import generate_smart_suggestions
-    from core.slot_filler import fill_template_slots
-
-    st.subheader("📄 내 공고문 직접 업로드 작성")
-    st.caption("공고 서식(DOCX)을 올리면 표 라벨/빈칸을 자동 탐지해 입력 폼을 만들고, 항목별 추천 답변을 제공합니다.")
-
-    uploaded = st.file_uploader("공고문 서식 DOCX 업로드", type=["docx"], key="up_docx")
-
-    if uploaded is not None:
-        file_id = f"{uploaded.name}_{uploaded.size}"
-        if st.session_state.get("up_file_id") != file_id:
-            up_dir = tempfile.mkdtemp(prefix="planpulse_up_")
-            tpl_path = os.path.join(up_dir, "template.docx")
-            with open(tpl_path, "wb") as f:
-                f.write(uploaded.getvalue())
-            try:
-                schema = parse_docx_template(tpl_path)
-            except Exception as e:
-                st.error(f"서식 분석 실패: {e}")
-                schema = None
-            if schema is not None:
-                schema.doc_title = os.path.splitext(uploaded.name)[0]
-                st.session_state.up_file_id = file_id
-                st.session_state.up_schema = schema
-                st.session_state.up_tpl_path = tpl_path
-                st.session_state.up_out_dir = up_dir
-
-    schema = st.session_state.get("up_schema")
-    if uploaded is not None and schema is not None and st.session_state.get("up_file_id") == f"{uploaded.name}_{uploaded.size}":
-        st.success(f"입력 슬롯 {len(schema.slots)}개를 탐지했습니다.")
-        profile = {"name": p_data.get("market_name", ""), "location": p_data.get("location", "")}
-
-        def _apply(key, text):
-            st.session_state[key] = text
-
-        for slot in schema.slots:
-            key = f"slot_val_{slot.slot_id}"
-            st.session_state.setdefault(key, "")
-            st.markdown(f"**{slot.label}**")
-            if slot.field_type == "textarea":
-                st.text_area(slot.label, key=key, placeholder=slot.hint, height=120, label_visibility="collapsed")
-            else:
-                st.text_input(slot.label, key=key, placeholder=slot.hint, label_visibility="collapsed")
-            suggestions = generate_smart_suggestions(slot.label, slot.hint, profile)
-            cols = st.columns(len(suggestions))
-            for i, (col, sug) in enumerate(zip(cols, suggestions), start=1):
-                col.button(f"추천안 {i}", key=f"sug_{slot.slot_id}_{i}", help=sug,
-                           on_click=_apply, args=(key, sug), use_container_width=True)
-
-        st.divider()
-        if st.button("📥 원본 서식 그대로 DOCX 생성", type="primary", use_container_width=True, key="up_build"):
-            values = {s.slot_id: st.session_state.get(f"slot_val_{s.slot_id}", "") for s in schema.slots}
-            out_path = os.path.join(st.session_state.up_out_dir, "filled.docx")
-            try:
-                fill_template_slots(st.session_state.up_tpl_path, schema, values, out_path)
-                with open(out_path, "rb") as f:
-                    st.session_state.up_result = f.read()
-            except Exception as e:
-                st.error(f"DOCX 생성 실패: {e}")
-
-        if st.session_state.get("up_result"):
-            st.download_button(
-                label="💾 작성 완료 DOCX 다운로드",
-                data=st.session_state.up_result,
-                file_name=f"{schema.doc_title}_작성완료.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True,
-                key="up_download",
-            )
-    elif uploaded is None:
-        st.info("DOCX 파일을 업로드하면 입력 폼이 표시됩니다.")

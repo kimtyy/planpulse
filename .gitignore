@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Sub-projects
+ConnectAI-LAB-Template/
+
+# Artifacts and outputs
+artifacts/
+output/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
