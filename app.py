@@ -274,6 +274,30 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
 # -----------------------------------------------------------------------------
 with tab1:
     st.subheader("1단계: 시장 기본정보 및 법정 4대 기초역량 검증")
+
+    with st.expander("🔍 전국 전통시장 실시간 공공데이터 자동완성", expanded=True):
+        from core.market_data_service import search_public_market_data, to_prefill
+        sq_col, key_col = st.columns([3, 2])
+        with sq_col:
+            market_query = st.text_input("시장 이름 검색", placeholder="예: 속초관광수산시장, 전주 남부시장, 제주 동문시장", key="market_search_q")
+        with key_col:
+            api_key_in = st.text_input("공공데이터포털 API 키 (선택)", type="password", key="market_api_key")
+        if market_query.strip():
+            found = search_public_market_data(market_query, api_key_in or None)
+            labels = [f"{m['market_name']} · {m['region']} [{m['data_quality']}]" for m in found]
+            pick = st.selectbox("검색 결과", range(len(found)), format_func=lambda i: labels[i], key="market_pick")
+            sel = found[min(pick, len(found) - 1)]
+            st.table([{"시장명": sel["market_name"], "소재지": sel["location"], "점포 수": sel["total_stores"],
+                       "대표 품목": sel["main_items"], "상인회 동의율(%)": sel["agreement_rate"],
+                       "온누리 가맹률(%)": sel["onnuri_rate"]}])
+            if sel["data_quality"] != "프로젝트 프리셋":
+                st.warning("⚠️ 공식 검증 데이터가 아닌 참고/자동 생성값입니다. 자동완성 후 반드시 실제 수치로 수정하세요.")
+            if st.button("이 시장 데이터로 전체 폼 자동완성", type="primary", key="market_prefill_btn"):
+                updated = dict(st.session_state.project_data)
+                updated.update(to_prefill(sel))
+                st.session_state.project_data = updated
+                st.toast(f"{sel['market_name']} 데이터로 폼이 자동완성되었습니다!", icon="✅")
+                st.rerun()
     col1, col2 = st.columns(2)
     with col1:
         market_name = st.text_input("시장/상점가 명칭", p_data["market_name"])
