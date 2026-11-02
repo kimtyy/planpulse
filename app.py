@@ -683,3 +683,10 @@ with tab7:
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True,
         )
+        import os
+import sys
+
+# Streamlit Cloud 실행 경로 및 상위 폴더 경로 등록
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+sys.path.insert(0, os.path.dirname(current_dir))
