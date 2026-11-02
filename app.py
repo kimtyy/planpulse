@@ -15,7 +15,6 @@ import streamlit as st
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
-sys.path.insert(0, os.path.dirname(CURRENT_DIR))    
 
 try:
     from planpulse.core.models import (
@@ -259,7 +258,7 @@ if load_jatgoeul:
 p_data = st.session_state.project_data
 
 # 7개 탭 인터페이스 구성
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "1단계: 시장정보 & 4대역량",
     "2단계: 문제인식 (Problem)",
     "3단계: 특성화 솔루션 (Solution)",
@@ -267,6 +266,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "5단계: 20억 예산 & 46개 회계세목 (Scale-up) ✨",
     "6단계: 추진체계 (Team)",
     "🚀 AI 생성 & 심사 리포트 및 DOCX 다운로드",
+    "📄 내 공고문 직접 업로드 작성",
 ])
 
 # -----------------------------------------------------------------------------
@@ -684,10 +684,82 @@ with tab7:
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True,
         )
-        import os
-import sys
 
-# Streamlit Cloud 실행 경로 및 상위 폴더 경로 등록
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
-sys.path.insert(0, os.path.dirname(current_dir))
+
+# -----------------------------------------------------------------------------
+# Tab 8: 내 공고문 직접 업로드 작성 (범용 서식 역공학 + 추천 답변 + 서식 보존 주입)
+# -----------------------------------------------------------------------------
+with tab8:
+    import tempfile
+    from core.template_parser import parse_docx_template
+    from core.smart_recommender import generate_smart_suggestions
+    from core.slot_filler import fill_template_slots
+
+    st.subheader("📄 내 공고문 직접 업로드 작성")
+    st.caption("공고 서식(DOCX)을 올리면 표 라벨/빈칸을 자동 탐지해 입력 폼을 만들고, 항목별 추천 답변을 제공합니다.")
+
+    uploaded = st.file_uploader("공고문 서식 DOCX 업로드", type=["docx"], key="up_docx")
+
+    if uploaded is not None:
+        file_id = f"{uploaded.name}_{uploaded.size}"
+        if st.session_state.get("up_file_id") != file_id:
+            up_dir = tempfile.mkdtemp(prefix="planpulse_up_")
+            tpl_path = os.path.join(up_dir, "template.docx")
+            with open(tpl_path, "wb") as f:
+                f.write(uploaded.getvalue())
+            try:
+                schema = parse_docx_template(tpl_path)
+            except Exception as e:
+                st.error(f"서식 분석 실패: {e}")
+                schema = None
+            if schema is not None:
+                schema.doc_title = os.path.splitext(uploaded.name)[0]
+                st.session_state.up_file_id = file_id
+                st.session_state.up_schema = schema
+                st.session_state.up_tpl_path = tpl_path
+                st.session_state.up_out_dir = up_dir
+
+    schema = st.session_state.get("up_schema")
+    if uploaded is not None and schema is not None and st.session_state.get("up_file_id") == f"{uploaded.name}_{uploaded.size}":
+        st.success(f"입력 슬롯 {len(schema.slots)}개를 탐지했습니다.")
+        profile = {"name": p_data.get("market_name", ""), "location": p_data.get("location", "")}
+
+        def _apply(key, text):
+            st.session_state[key] = text
+
+        for slot in schema.slots:
+            key = f"slot_val_{slot.slot_id}"
+            st.session_state.setdefault(key, "")
+            st.markdown(f"**{slot.label}**")
+            if slot.field_type == "textarea":
+                st.text_area(slot.label, key=key, placeholder=slot.hint, height=120, label_visibility="collapsed")
+            else:
+                st.text_input(slot.label, key=key, placeholder=slot.hint, label_visibility="collapsed")
+            suggestions = generate_smart_suggestions(slot.label, slot.hint, profile)
+            cols = st.columns(len(suggestions))
+            for i, (col, sug) in enumerate(zip(cols, suggestions), start=1):
+                col.button(f"추천안 {i}", key=f"sug_{slot.slot_id}_{i}", help=sug,
+                           on_click=_apply, args=(key, sug), use_container_width=True)
+
+        st.divider()
+        if st.button("📥 원본 서식 그대로 DOCX 생성", type="primary", use_container_width=True, key="up_build"):
+            values = {s.slot_id: st.session_state.get(f"slot_val_{s.slot_id}", "") for s in schema.slots}
+            out_path = os.path.join(st.session_state.up_out_dir, "filled.docx")
+            try:
+                fill_template_slots(st.session_state.up_tpl_path, schema, values, out_path)
+                with open(out_path, "rb") as f:
+                    st.session_state.up_result = f.read()
+            except Exception as e:
+                st.error(f"DOCX 생성 실패: {e}")
+
+        if st.session_state.get("up_result"):
+            st.download_button(
+                label="💾 작성 완료 DOCX 다운로드",
+                data=st.session_state.up_result,
+                file_name=f"{schema.doc_title}_작성완료.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="up_download",
+            )
+    elif uploaded is None:
+        st.info("DOCX 파일을 업로드하면 입력 폼이 표시됩니다.")
