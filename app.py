@@ -166,7 +166,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 헤더 영역
-st.title("📋 PlanPulse (플랜펄스) - 국책 사업계획서 자동생성 엔진")
+st.title("📋 PlanPulse (플랜펄스) - 정부지원 사업계획서 자동생성 엔진")
 
 # -----------------------------------------------------------------------------
 # 신청 대상 선택 (모드 스위치)
@@ -182,7 +182,7 @@ if app_mode == MODE_PERSONAL:
         calc_repayment_schedule, summarize_by_year, project_revenue, build_personal_loan_docx,
     )
 
-    st.caption("소상공인시장진흥공단 / 신용보증재단 정책자금(5천만~1억원) 신청용 간이 사업계획서 (3~5P)")
+    st.caption("소상공인시장진흥공단 / 신용보증재단 정책자금(5천만\~1억원) 신청용 간이 사업계획서 (3\~5P)")
     st.info("ℹ️ 기관별 공식 제출 양식이 따로 있으면 그 양식을 우선하세요. 이 서식은 사업개요·자금소요·사업타당성·상환계획을 정리한 간이 계획서입니다.")
 
     ptab1, ptab2, ptab3, ptab4, ptab5 = st.tabs([
@@ -207,7 +207,7 @@ if app_mode == MODE_PERSONAL:
         pl_amount_man = st.number_input("신청 금액 (만원)", 500, 10000, 5000, step=100, key="pl_amount",
                                         help="소상공인 정책자금 일반 신청 범위: 5천만~1억원")
         if pl_amount_man < 5000 or pl_amount_man > 10000:
-            st.warning("⚠️ 일반적인 신청 범위(5천만~1억원)를 벗어났습니다. 해당 기관 공고를 확인하세요.")
+            st.warning("⚠️ 일반적인 신청 범위(5천만\~1억원)를 벗어났습니다. 해당 기관 공고를 확인하세요.")
         fac_pct = st.slider("시설자금 비중 (%)", 0, 100, 40, key="pl_fac_pct")
         fac_man = round(pl_amount_man * fac_pct / 100)
         work_man = pl_amount_man - fac_man
